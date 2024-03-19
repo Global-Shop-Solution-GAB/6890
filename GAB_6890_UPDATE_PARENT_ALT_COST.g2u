@@ -1,0 +1,195 @@
+﻿Program.Sub.Preflight.Start
+V.Global.sComCurr.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+
+V.Local.i1.Declare
+V.Local.i2.Declare
+V.Local.fCost.Declare
+V.Local.sSQL.Declare
+V.Local.sText.Declare
+V.Local.s1.Declare
+V.Local.sStatus.Declare
+v.Local.sProcessIDfile.Declare
+v.Local.bExists.Declare
+v.Local.sCheckFile.Declare
+v.Local.sLastPartfile.Declare
+V.Local.iCount.Declare
+V.Local.iDate.Declare
+
+F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+F.Intrinsic.Date.Weekday(V.Ambient.Date, V.Local.iDate)
+F.Intrinsic.Control.If(V.Local.iDate,<>,7)
+	F.Intrinsic.Control.If(V.Local.iDate,<>,1)
+		F.ODBC.Connection!conx.Close
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+'Get Base Currency
+F.Global.General.ReadOption("000000",1,"","0000",V.Global.sComCurr)
+
+f.Intrinsic.String.Build("{0}\GAB_6890_PID_{1}.txt",v.Caller.GasDir,v.Caller.CompanyCode,v.Local.sProcessIDfile)
+f.Intrinsic.file.Exists(v.Local.sProcessIDfile,v.Local.bExists)
+'No file existed
+f.Intrinsic.control.If(v.Local.bExists.Not)
+	f.Intrinsic.File.String2File(v.Local.sProcessIDfile,v.Ambient.PID)
+
+'There is file PID
+f.Intrinsic.control.Else
+	f.Intrinsic.File.File2String(v.Local.sProcessIDfile,v.Local.sCheckFile)
+	
+	'check if the file is blank
+	'File is not blank
+	f.Intrinsic.Control.If(v.Local.sCheckFile,<>,"")
+		f.Intrinsic.task.PIDRunning(v.Local.sCheckFile,v.Local.bExists)
+		'Other PID stops running
+		f.Intrinsic.Control.If(v.Local.bExists,=,false)
+			f.intrinsic.File.String2File(v.Local.sProcessIDfile,v.Ambient.PID)
+		
+		'Other PID is still running	
+		f.Intrinsic.Control.Else
+'				f.Intrinsic.Control.CallSub("Unload")
+			F.ODBC.Connection!conx.close
+			F.Intrinsic.Control.End
+		f.Intrinsic.Control.EndIf
+		
+	'There is file PID but blank	
+	f.Intrinsic.Control.Else
+		f.intrinsic.File.String2File(v.Local.sProcessIDfile,v.Ambient.PID)
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.EndIf
+
+'Check Last Part Number
+f.Intrinsic.String.Build("{0}\GAB_6890_LAST_PART_{1}.txt",v.Caller.GasDir,v.Caller.CompanyCode,v.Local.sLastPartfile)
+f.Intrinsic.file.Exists(v.Local.sLastPartfile,v.Local.bExists)
+'No file existed
+f.Intrinsic.control.If(v.Local.bExists.Not)
+	f.Intrinsic.File.String2File(v.Local.sLastPartfile,"")
+f.Intrinsic.control.Else
+	f.Intrinsic.File.File2String(v.Local.sLastPartfile,v.Local.sCheckFile)
+f.Intrinsic.Control.EndIf
+
+
+'F.Data.DataTable.CreateFromSQL("dtParent","conx","Select parent, count(sequence_bom) as Cnt from bom_mstr where parent not in (select part from bom_mstr) and parent <> 'AIMP-21-AIMP' and parent <> 'BIG-22-POPPAS' and parent <> 'BLACK-22-BOXS' and parent <> 'BPC' and parent <> 'BROWN-21-FLAT' and parent <> 'BROWN-21-MESH' and parent <> 'BRUCE-21-ADD' and parent <> 'BRUCE-21-BRUCE' and parent <> 'BTC-21-BTC' and parent <> 'BTC-21-GUTTER' and parent <> 'BTC-A476' and parent <> 'BTC-A477' and parent <> 'BTC-A483' group by parent",True)
+f.Intrinsic.Control.If(v.Local.sCheckFile.Trim,=,"")
+	V.Local.sSQL.Set("Select parent, count(sequence_bom) as Cnt from bom_mstr group by parent")
+f.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("Select parent, count(sequence_bom) as Cnt from bom_mstr where parent > '{0}' group by parent", v.Local.sCheckFile, V.Local.sSQL)
+f.Intrinsic.Control.EndIf
+F.Data.DataTable.CreateFromSQL("dtParent","conx",V.Local.sSQL,True)
+'F.ODBC.Connection!conx.Close
+
+'F.Intrinsic.Control.For(V.Local.i1,0,V.DataTable.dtParent.RowCount--,1)
+f.Intrinsic.Control.If(V.DataTable.dtParent.RowCount--,>=,50)
+	V.Local.iCount.Set(50)
+f.Intrinsic.Control.ElseIf(V.DataTable.dtParent.RowCount--,<,50)
+f.Intrinsic.Control.AndIf(V.DataTable.dtParent.RowCount--,>,0)
+	V.Local.iCount.Set(V.DataTable.dtParent.RowCount--)
+f.Intrinsic.Control.ElseIf(V.DataTable.dtParent.RowCount--,=,0)
+	V.Local.iCount.Set(0)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.Control.If(V.Local.iCount,<>,0)
+	F.Intrinsic.Math.Sub(V.Local.iCount,1,V.Local.iCount)
+	F.Intrinsic.Control.For(V.Local.i1,0,V.Local.iCount,1)
+	
+	'F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+	'	F.Intrinsic.Control.If(V.DataTable.dtParent(V.Local.i1).Cnt!FieldVal,<,50)
+		F.Intrinsic.String.Build("CALL{0}",V.Local.i1,V.Local.s1)
+'		F.Intrinsic.String.Build("Updating alt cost to part #{0}",V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim,V.Local.sText)
+'		F.Intrinsic.UI.InvokeWaitDialog(V.Local.sText,"GAB Test [APAC]")
+		
+		F.Global.Callwrapper.New(V.Local.s1,"Manufacturing.BOM.CostBuildup")
+		F.Global.Callwrapper.SetProperty(V.Local.s1,"Program","RE0100")
+		F.Global.Callwrapper.SetProperty(V.Local.s1,"Parent",V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim)
+		F.Global.Callwrapper.SetProperty(V.Local.s1,"Flags",2)
+		F.Global.Callwrapper.SetProperty(V.Local.s1, "UseBestOrderQty", False)
+		F.Global.Callwrapper.SetProperty(V.Local.s1, "UseStandardCostQty", False)
+		F.Global.CallWrapper.Run(V.Local.s1)
+		F.Global.CallWrapper.GetProperty(V.Local.s1,"Status",V.Local.sStatus)
+		
+		F.Intrinsic.Control.If(V.Local.sStatus,=,"Success")
+			'query BI table to pull in the information associated with the BOM Cost buildup
+			F.Intrinsic.String.Build("SELECT LOCN, SEQUENCE, LEVEL, PART, DESCRIPTION, UNIT, ADDED_COST, MATERIAL, LABOR, OVERHEAD, OUTSIDE, FREIGHT, OTHER, LABOR_HRS, PARENT_QTY_1 FROM BI_BOM_BUILDUP_E WHERE TRMNL = '{0}' AND PARENT_KEY = '{1}' AND RPTID = '004203' AND DESCRIPTION <> '' AND PART <> '' ", V.Caller.Terminal, V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim, V.Local.sSQL)
+			F.Data.DataTable.CreateFromSQL("dtBOMBuild", "conx", V.Local.sSQL, True)
+			F.Data.Datatable.Compute("dtBOMBuild","sum(ADDED_COST)","",V.Local.fCost)
+			F.Data.Datatable.Close("dtBOMBuild")
+		f.Intrinsic.Control.EndIf
+	'f.Intrinsic.Debug.ShowCallerInfo
+		F.Intrinsic.String.Build("Update Inventory_Mstr Set AMT_ALT_Cost = {1} where part = '{0}'", V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim, V.Local.fCost, V.Local.sSQL)
+		F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+		
+	'	F.Intrinsic.String.Build("select parent, count(sequence_bom) as Cnt from BOM_MSTR where parent = '{0}' group by parent order by cnt desc;", V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim, V.Local.sSQL)
+	'	F.ODBC.Connection!conx.OpenRecordsetRO("rst",V.Local.sSQL)	
+	'	F.Intrinsic.Control.If(V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim,=,"ZBBBSJTI")
+	'		F.Intrinsic.UI.Sleep(300)
+	'	F.Intrinsic.Control.EndIf
+	'	F.ODBC.conx!rst.Close
+		'F.Intrinsic.UI.Sleep(60)
+	'	F.Intrinsic.Control.EndIf
+	'F.ODBC.Connection!conx.Close
+	F.Intrinsic.Control.Next(V.Local.i1)
+	f.Intrinsic.File.String2File(v.Local.sLastPartfile,V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim)
+
+f.Intrinsic.Control.Else
+	F.Data.DataTable.CreateFromSQL("dtParent1","conx","Select parent, count(sequence_bom) as Cnt from bom_mstr group by parent",True)
+	F.Intrinsic.Control.For(V.Local.i2,0,50,1)
+	
+	'F.ODBC.Connection!conx.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+	'	F.Intrinsic.Control.If(V.DataTable.dtParent(V.Local.i2).Cnt!FieldVal,<,50)
+		F.Intrinsic.String.Build("CALL{0}",V.Local.i2,V.Local.s1)
+'		F.Intrinsic.String.Build("Updating alt cost to part #{0}",V.DataTable.dtParent1(V.Local.i2).Parent!FieldValTrim,V.Local.sText)
+'		F.Intrinsic.UI.InvokeWaitDialog(V.Local.sText,"GAB Test [APAC]")
+		
+		F.Global.Callwrapper.New(V.Local.s1,"Manufacturing.BOM.CostBuildup")
+		F.Global.Callwrapper.SetProperty(V.Local.s1,"Program","RE0100")
+		F.Global.Callwrapper.SetProperty(V.Local.s1,"Parent",V.DataTable.dtParent1(V.Local.i2).Parent!FieldValTrim)
+		F.Global.Callwrapper.SetProperty(V.Local.s1,"Flags",2)
+		F.Global.Callwrapper.SetProperty(V.Local.s1, "UseBestOrderQty", False)
+		F.Global.Callwrapper.SetProperty(V.Local.s1, "UseStandardCostQty", False)
+		F.Global.CallWrapper.Run(V.Local.s1)
+		F.Global.CallWrapper.GetProperty(V.Local.s1,"Status",V.Local.sStatus)
+		
+		F.Intrinsic.Control.If(V.Local.sStatus,=,"Success")
+			'query BI table to pull in the information associated with the BOM Cost buildup
+			F.Intrinsic.String.Build("SELECT LOCN, SEQUENCE, LEVEL, PART, DESCRIPTION, UNIT, ADDED_COST, MATERIAL, LABOR, OVERHEAD, OUTSIDE, FREIGHT, OTHER, LABOR_HRS, PARENT_QTY_1 FROM BI_BOM_BUILDUP_E WHERE TRMNL = '{0}' AND PARENT_KEY = '{1}' AND RPTID = '004203' AND DESCRIPTION <> '' AND PART <> '' ", V.Caller.Terminal, V.DataTable.dtParent1(V.Local.i2).Parent!FieldValTrim, V.Local.sSQL)
+			F.Data.DataTable.CreateFromSQL("dtBOMBuild", "conx", V.Local.sSQL, True)
+			F.Data.Datatable.Compute("dtBOMBuild","sum(ADDED_COST)","",V.Local.fCost)
+			F.Data.Datatable.Close("dtBOMBuild")
+		f.Intrinsic.Control.EndIf
+	'f.Intrinsic.Debug.ShowCallerInfo
+		F.Intrinsic.String.Build("Update Inventory_Mstr Set AMT_ALT_Cost = {1} where part = '{0}'", V.DataTable.dtParent1(V.Local.i2).Parent!FieldValTrim, V.Local.fCost, V.Local.sSQL)
+		F.ODBC.Connection!conx.Execute(V.Local.sSQL)
+		
+	'	F.Intrinsic.String.Build("select parent, count(sequence_bom) as Cnt from BOM_MSTR where parent = '{0}' group by parent order by cnt desc;", V.DataTable.dtParent(V.Local.i2).Parent!FieldValTrim, V.Local.sSQL)
+	'	F.ODBC.Connection!conx.OpenRecordsetRO("rst",V.Local.sSQL)	
+	'	F.Intrinsic.Control.If(V.DataTable.dtParent(V.Local.i2).Parent!FieldValTrim,=,"ZBBBSJTI")
+	'		F.Intrinsic.UI.Sleep(300)
+	'	F.Intrinsic.Control.EndIf
+	'	F.ODBC.conx!rst.Close
+		'F.Intrinsic.UI.Sleep(60)
+	'	F.Intrinsic.Control.EndIf
+	'F.ODBC.Connection!conx.Close
+	F.Intrinsic.Control.Next(V.Local.i2)
+	f.Intrinsic.File.String2File(v.Local.sLastPartfile,V.DataTable.dtParent(V.Local.i1).Parent!FieldValTrim)
+	F.Data.Datatable.Close("dtParent1")
+
+f.Intrinsic.Control.EndIf
+
+f.intrinsic.File.String2File(v.Local.sProcessIDfile,"")
+
+'F.Intrinsic.UI.CloseWaitDialog
+'F.Intrinsic.UI.Msgbox("DONE!")
+F.Data.Datatable.Close("dtParent")
+F.ODBC.Connection!conx.Close
+F.Intrinsic.Control.End
+Program.Sub.Main.End
+
+Program.Sub.Comments.Start
+${$5$}$20.1.8273.27146$}$1
+${$6$}$dyunus$}$20220907104303154$}$xZ6SHi8g7O0Qsxe6AiO2NH3PnOKQRy0TMU5N3zC63gOTDOhznxUdTLflTiRnVZ5C3dzMRs6QsZU=
+Program.Sub.Comments.End
